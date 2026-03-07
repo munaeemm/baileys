@@ -1,3 +1,4 @@
+//server.js
 const express = require("express");
 const {
   default: makeWASocket,
