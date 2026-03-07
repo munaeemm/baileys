@@ -26,8 +26,8 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.json());
-app.use(express.static("public"));
 
+// Auth BEFORE static so public folder is also protected
 if (process.env.AUTH_USER && process.env.AUTH_PASS) {
   app.use(
     basicAuth({
@@ -36,6 +36,8 @@ if (process.env.AUTH_USER && process.env.AUTH_PASS) {
     }),
   );
 }
+
+app.use(express.static("public"));
 
 const PORT = process.env.PORT || 3000;
 const SESSIONS_DIR = "./sessions";
@@ -82,44 +84,77 @@ async function startSession(sessionId) {
   sock.ev.on("creds.update", saveCreds);
 
   // INCOMING MESSAGES
-  sock.ev.on("messages.upsert", async ({ messages }) => {
-    const msg = messages[0];
-    if (!msg?.message) return;
+  sock.ev.on("messages.upsert", async ({ messages, type }) => {
+    // Only process new messages, not history sync
+    if (type !== "notify") return;
 
-    const jid = msg.key.remoteJid;
-    const fromMe = msg.key.fromMe;
+    for (const msg of messages) {
+      if (!msg?.message) continue;
 
-    let text =
-      msg.message?.conversation ||
-      msg.message?.extendedTextMessage?.text ||
-      msg.message?.imageMessage?.caption ||
-      msg.message?.videoMessage?.caption ||
-      "";
+      const jid = msg.key.remoteJid;
+      const fromMe = msg.key.fromMe;
 
-    try {
-      await supabase.from("WAMessages").insert({
-        message_id: msg.key.id,
-        account_id: sessionId,
-        jid: jid,
-        from_me: fromMe,
-        text: text,
-        status: "received",
-        read: fromMe,
-        timestamp: new Date(msg.messageTimestamp * 1000).toISOString(),
-      });
+      // Skip group messages (optional — remove if you want groups)
+      if (jid.endsWith("@g.us")) continue;
 
-      await supabase.from("WAContacts").upsert(
-        {
-          account_id: sessionId,
-          jid: jid,
-          phone: jid.replace("@s.whatsapp.net", ""),
-          last_message: text,
-          last_message_at: new Date().toISOString(),
-        },
-        { onConflict: "account_id,jid" },
+      const text =
+        msg.message?.conversation ||
+        msg.message?.extendedTextMessage?.text ||
+        msg.message?.imageMessage?.caption ||
+        msg.message?.videoMessage?.caption ||
+        "";
+
+      const timestamp = new Date(msg.messageTimestamp * 1000).toISOString();
+
+      console.log(
+        `[${sessionId}] MSG from ${jid} | fromMe:${fromMe} | "${text}" | ${timestamp}`,
       );
-    } catch (err) {
-      console.error("Supabase insert error:", err);
+
+      try {
+        // Use upsert to avoid duplicate key errors on resync
+        const { error: msgError } = await supabase.from("WAMessages").upsert(
+          {
+            message_id: msg.key.id,
+            account_id: sessionId,
+            jid: jid,
+            from_me: fromMe,
+            text: text,
+            status: "received",
+            read: fromMe,
+            timestamp: timestamp,
+          },
+          { onConflict: "message_id,account_id" },
+        );
+
+        if (msgError) {
+          console.error(
+            `[${sessionId}] WAMessages upsert error:`,
+            JSON.stringify(msgError),
+          );
+        }
+
+        const { error: contactError } = await supabase
+          .from("WAContacts")
+          .upsert(
+            {
+              account_id: sessionId,
+              jid: jid,
+              phone: jid.replace("@s.whatsapp.net", ""),
+              last_message: text,
+              last_message_at: new Date().toISOString(),
+            },
+            { onConflict: "account_id,jid" },
+          );
+
+        if (contactError) {
+          console.error(
+            `[${sessionId}] WAContacts upsert error:`,
+            JSON.stringify(contactError),
+          );
+        }
+      } catch (err) {
+        console.error(`[${sessionId}] Supabase error:`, JSON.stringify(err));
+      }
     }
   });
 
@@ -150,6 +185,9 @@ async function startSession(sessionId) {
           : "logged_out";
 
         io.emit("status", { sessionId, status: sessionStatus[sessionId] });
+        console.log(
+          `[${sessionId}] Disconnected. Reason: ${reason}. Reconnect: ${shouldReconnect}`,
+        );
 
         if (shouldReconnect) {
           setTimeout(() => startSession(sessionId), 5000);
@@ -185,14 +223,33 @@ app.get("/api/sessions", (req, res) => {
 
 app.post("/api/sessions", async (req, res) => {
   const { id, port } = req.body;
-
   const ids = getSessionIds();
-
   ids.push({ id, port: port || null });
+  saveSessionIds(ids);
+  await startSession(id);
+  res.json({ ok: true });
+});
 
+app.delete("/api/sessions/:id", (req, res) => {
+  const { id } = req.params;
+  let ids = getSessionIds();
+  ids = ids.filter((s) => s.id !== id);
   saveSessionIds(ids);
 
-  await startSession(id);
+  if (clients[id]) {
+    try {
+      clients[id].end();
+    } catch (_) {}
+    delete clients[id];
+  }
+
+  delete sessionStatus[id];
+  delete qrCodes[id];
+
+  const sessionPath = path.join(SESSIONS_DIR, id);
+  if (fs.existsSync(sessionPath)) {
+    fs.rmSync(sessionPath, { recursive: true, force: true });
+  }
 
   res.json({ ok: true });
 });
@@ -212,16 +269,26 @@ app.post("/api/sessions/:id/send", async (req, res) => {
 
     const result = await clients[id].sendMessage(waJid, { text: message });
 
-    await supabase.from("WAMessages").insert({
-      message_id: result.key.id,
-      account_id: id,
-      jid: waJid,
-      from_me: true,
-      text: message,
-      status: "sent",
-      read: true,
-      timestamp: new Date().toISOString(),
-    });
+    const { error: msgError } = await supabase.from("WAMessages").upsert(
+      {
+        message_id: result.key.id,
+        account_id: id,
+        jid: waJid,
+        from_me: true,
+        text: message,
+        status: "sent",
+        read: true,
+        timestamp: new Date().toISOString(),
+      },
+      { onConflict: "message_id,account_id" },
+    );
+
+    if (msgError) {
+      console.error(
+        `[${id}] Send WAMessages upsert error:`,
+        JSON.stringify(msgError),
+      );
+    }
 
     res.json({ ok: true });
   } catch (e) {
