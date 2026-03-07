@@ -83,7 +83,47 @@ async function startSession(sessionId) {
   io.emit("status", { sessionId, status: "connecting" });
 
   sock.ev.on("creds.update", saveCreds);
+  sock.ev.on("messages.upsert", async ({ messages }) => {
+    const msg = messages[0];
+    if (!msg.message) return;
 
+    const jid = msg.key.remoteJid?.replace("@c.us", "@s.whatsapp.net");
+    const fromMe = msg.key.fromMe;
+
+    let text =
+      msg.message?.conversation ||
+      msg.message?.extendedTextMessage?.text ||
+      msg.message?.imageMessage?.caption ||
+      msg.message?.videoMessage?.caption ||
+      "";
+
+    if (!text) return;
+
+    try {
+      await supabase.from("WAMessages").insert({
+        account_id: sessionId,
+        jid: jid,
+        from_me: fromMe,
+        text: text,
+        status: "received",
+        read: fromMe,
+        timestamp: new Date().toISOString(),
+      });
+
+      await supabase.from("WAContacts").upsert(
+        {
+          account_id: sessionId,
+          jid: jid,
+          phone: jid.replace("@s.whatsapp.net", ""),
+          last_message: text,
+          last_message_at: new Date().toISOString(),
+        },
+        { onConflict: "account_id,jid" },
+      );
+    } catch (err) {
+      console.error("Supabase insert error:", err);
+    }
+  });
   sock.ev.on(
     "connection.update",
     async ({ connection, lastDisconnect, qr }) => {
