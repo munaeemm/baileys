@@ -14,6 +14,12 @@ const http = require("http");
 const { Server } = require("socket.io");
 const basicAuth = require("express-basic-auth");
 require("dotenv").config();
+const { createClient } = require("@supabase/supabase-js");
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
 
 const app = express();
 const server = http.createServer(app);
@@ -199,6 +205,17 @@ app.post("/api/sessions/:id/send", async (req, res) => {
   try {
     const waJid = number.replace(/\D/g, "") + "@s.whatsapp.net";
     await clients[id].sendMessage(waJid, { text: message });
+
+    await supabase.from("WAMessages").insert({
+      account_id: id,
+      jid: waJid,
+      from_me: true,
+      text: message,
+      status: "sent",
+      read: true,
+      timestamp: new Date().toISOString(),
+    });
+
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
