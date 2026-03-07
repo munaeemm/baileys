@@ -204,6 +204,10 @@ app.post("/api/sessions/:id/send", async (req, res) => {
   }
 });
 
+app.get("/status", (req, res) => {
+  res.json({ ok: true });
+});
+
 server.listen(PORT, () =>
   console.log(`Baileys Manager running on port ${PORT}`),
 );
