@@ -205,7 +205,17 @@ app.post("/api/sessions/:id/send", async (req, res) => {
 });
 
 app.get("/status", (req, res) => {
-  res.json({ ok: true });
+  const accountId = req.query.accountId;
+  if (accountId) {
+    return res.json({
+      connected: sessionStatus[accountId] === "connected",
+      qr: qrCodes[accountId] || null,
+    });
+  }
+  res.json({
+    ok: true,
+    connected: Object.values(sessionStatus).some((s) => s === "connected"),
+  });
 });
 
 server.listen(PORT, () =>
