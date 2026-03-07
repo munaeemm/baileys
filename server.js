@@ -44,7 +44,9 @@ const qrCodes = {}; // { sessionId: base64QR }
 function getSessionIds() {
   const configFile = path.join(SESSIONS_DIR, "sessions.json");
   if (!fs.existsSync(configFile)) return [];
-  return JSON.parse(fs.readFileSync(configFile, "utf8"));
+  const data = JSON.parse(fs.readFileSync(configFile, "utf8"));
+  // migrate old string format
+  return data.map((s) => (typeof s === "string" ? { id: s, port: null } : s));
 }
 
 function saveSessionIds(ids) {
@@ -122,8 +124,8 @@ async function startSession(sessionId) {
 // Start all saved sessions on boot
 (async () => {
   const ids = getSessionIds();
-  for (const id of ids) {
-    await startSession(id);
+  for (const s of ids) {
+    await startSession(s.id);
   }
 })();
 
@@ -132,23 +134,24 @@ async function startSession(sessionId) {
 // Get all sessions
 app.get("/api/sessions", (req, res) => {
   const ids = getSessionIds();
-  const data = ids.map((id) => ({
-    id,
-    status: sessionStatus[id] || "stopped",
-    qr: qrCodes[id] || null,
+  const data = ids.map((s) => ({
+    id: s.id,
+    port: s.port,
+    status: sessionStatus[s.id] || "stopped",
+    qr: qrCodes[s.id] || null,
   }));
   res.json(data);
 });
 
 // Add new session
 app.post("/api/sessions", async (req, res) => {
-  const { id } = req.body;
+  const { id, port } = req.body;
   if (!id || !/^[a-zA-Z0-9_-]+$/.test(id))
     return res.status(400).json({ error: "Invalid session ID" });
   const ids = getSessionIds();
-  if (ids.includes(id))
+  if (ids.find((s) => s.id === id))
     return res.status(400).json({ error: "Session already exists" });
-  ids.push(id);
+  ids.push({ id, port: port || null });
   saveSessionIds(ids);
   await startSession(id);
   res.json({ ok: true });
@@ -157,7 +160,7 @@ app.post("/api/sessions", async (req, res) => {
 // Delete session
 app.delete("/api/sessions/:id", (req, res) => {
   const { id } = req.params;
-  const ids = getSessionIds().filter((s) => s !== id);
+  const ids = getSessionIds().filter((s) => s.id !== id);
   saveSessionIds(ids);
   if (clients[id]) {
     clients[id].end();
