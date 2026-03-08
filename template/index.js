@@ -103,7 +103,7 @@ async function connectToWhatsApp() {
   sock = makeWASocket({
     auth: state,
     version: [2, 3000, 1033893291],
-    browser: Browsers.ubuntu("Chrome"),
+    browser: ["Ubuntu", "Chrome", "20.0.04"],
     printQRInTerminal: true,
   });
   sock.ev.on("creds.update", saveCreds);
