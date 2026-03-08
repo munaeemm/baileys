@@ -616,6 +616,51 @@
       </div>
     </div>
 
+    <!-- Logs Modal -->
+    <div class="modal-backdrop" id="logs-modal">
+      <div class="modal" style="max-width: 700px">
+        <div class="modal-title" id="logs-title">Logs</div>
+        <div style="margin-bottom: 8px; display: flex; gap: 8px">
+          <button class="btn btn-sm" onclick="refreshLogs()">↺ Refresh</button>
+          <button
+            class="btn btn-sm"
+            id="logs-tab-out"
+            onclick="showLogsTab('out')"
+            style="color: var(--accent)"
+          >
+            stdout
+          </button>
+          <button
+            class="btn btn-sm"
+            id="logs-tab-err"
+            onclick="showLogsTab('err')"
+          >
+            stderr
+          </button>
+        </div>
+        <pre
+          id="logs-content"
+          style="
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 11px;
+            font-family: var(--mono);
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            color: var(--text2);
+          "
+        >
+Loading...</pre
+        >
+        <div class="modal-actions">
+          <button class="btn" onclick="closeLogsModal()">Close</button>
+        </div>
+      </div>
+    </div>
+
     <div id="toast"></div>
 
     <script>
@@ -727,6 +772,7 @@
       ${st === "online" ? `<button class="btn btn-sm" onclick="stopInstance('${a.id}')">■ Stop</button>` : ""}
       ${st === "online" ? `<button class="btn btn-sm" onclick="restartInstance('${a.id}')">↺ Restart</button>` : ""}
       <button class="btn btn-warn btn-sm" onclick="logoutInstance('${a.id}')">⟳ Re-scan QR</button>
+      <button class="btn btn-sm" onclick="showLogs('${a.id}')">📋 Logs</button>
       <button class="btn btn-sm" onclick="openEditModal('${a.id}')">✎ Edit</button>
       <button class="btn btn-danger btn-sm" onclick="deleteInstance('${a.id}')">✕ Delete</button>
     </div>
@@ -885,6 +931,47 @@
         toast(`Deleted ${id}`, "ok");
         await loadAccounts();
       }
+
+      // ── Logs ──────────────────────────────────────────────────────────────────────
+      let logsAccountId = null;
+      let logsData = { out: "", err: "" };
+      let logsTab = "out";
+
+      async function showLogs(id) {
+        logsAccountId = id;
+        document.getElementById("logs-title").textContent =
+          `Logs — ${accounts[id]?.name || id}`;
+        document.getElementById("logs-modal").classList.add("open");
+        await refreshLogs();
+      }
+
+      async function refreshLogs() {
+        if (!logsAccountId) return;
+        document.getElementById("logs-content").textContent = "Loading...";
+        const r = await api(`/api/accounts/${logsAccountId}/logs?lines=50`);
+        logsData = r;
+        showLogsTab(logsTab);
+      }
+
+      function showLogsTab(tab) {
+        logsTab = tab;
+        document.getElementById("logs-tab-out").style.color =
+          tab === "out" ? "var(--accent)" : "";
+        document.getElementById("logs-tab-err").style.color =
+          tab === "err" ? "var(--danger)" : "";
+        document.getElementById("logs-content").textContent =
+          logsData[tab] || "(empty)";
+        document.getElementById("logs-content").scrollTop = 999999;
+      }
+
+      function closeLogsModal() {
+        document.getElementById("logs-modal").classList.remove("open");
+        logsAccountId = null;
+      }
+
+      document.getElementById("logs-modal").addEventListener("click", (e) => {
+        if (e.target.id === "logs-modal") closeLogsModal();
+      });
 
       // ── Git Pull ──────────────────────────────────────────────────────────────────
       async function gitPull() {

@@ -283,14 +283,54 @@ app.post("/api/accounts/:id/logout", (req, res) => {
   if (!account) return res.status(404).json({ error: "Not found" });
 
   pm2Stop(`wa-${account.id}`);
-  const authDir = path.join(ACCOUNTS_DIR, account.id, "auth");
-  fs.rmSync(authDir, { recursive: true, force: true });
-  setTimeout(() => {
-    const accountDir = path.join(ACCOUNTS_DIR, account.id);
-    pm2Start(`wa-${account.id}`, accountDir);
-  }, 2000);
+  const accountDir = path.join(ACCOUNTS_DIR, account.id);
+  // Wipe both possible auth folder names
+  fs.rmSync(path.join(accountDir, "auth"), { recursive: true, force: true });
+  fs.rmSync(path.join(accountDir, "auth_info_baileys"), {
+    recursive: true,
+    force: true,
+  });
+  setTimeout(() => pm2Start(`wa-${account.id}`, accountDir), 2000);
 
   res.json({ ok: true, message: "Auth cleared, restarting for new QR" });
+});
+
+// GET /api/accounts/:id/logs
+app.get("/api/accounts/:id/logs", (req, res) => {
+  const cfg = loadConfig();
+  const account = cfg.accounts[req.params.id];
+  if (!account) return res.status(404).json({ error: "Not found" });
+  const lines = parseInt(req.query.lines || "30");
+  try {
+    const name = `wa-${account.id}`;
+    const list = pm2List();
+    const proc = list.find((p) => p.name === name);
+    if (!proc) return res.json({ out: "", err: "Process not found in PM2" });
+    const outLog = proc.pm2_env?.pm_out_log_path;
+    const errLog = proc.pm2_env?.pm_err_log_path;
+    const readTail = (f) => {
+      if (!f || !fs.existsSync(f)) return "";
+      const content = fs.readFileSync(f, "utf8");
+      return content.split("\n").slice(-lines).join("\n");
+    };
+    res.json({ out: readTail(outLog), err: readTail(errLog) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/git-pull — pull latest from GitHub then update all
+app.post("/api/git-pull", (req, res) => {
+  try {
+    const output = execSync("git pull origin main 2>&1", {
+      cwd: ROOT,
+      encoding: "utf8",
+    });
+    console.log("[GIT PULL]", output);
+    res.json({ ok: true, output });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 // POST /api/update-all — push template/index.js to all instances then restart
