@@ -91,11 +91,15 @@ async function startSession(sessionId) {
     for (const msg of messages) {
       if (!msg?.message) continue;
 
-      const jid = msg.key.remoteJid;
-      const fromMe = msg.key.fromMe;
+      const rawJid = msg.key.remoteJid;
 
-      // Skip group messages (optional — remove if you want groups)
-      if (jid.endsWith("@g.us")) continue;
+      // Skip group messages
+      if (rawJid.endsWith("@g.us")) continue;
+
+      // Always normalize to @s.whatsapp.net (handles @lid JIDs)
+      const number = rawJid.replace("@s.whatsapp.net", "").replace("@lid", "");
+      const jid = number + "@s.whatsapp.net";
+      const fromMe = msg.key.fromMe;
 
       const text =
         msg.message?.conversation ||
@@ -111,12 +115,35 @@ async function startSession(sessionId) {
       );
 
       try {
-        // Use upsert to avoid duplicate key errors on resync
+        // Normalize LID JIDs — if a contact already exists with @s.whatsapp.net, use that JID instead
+        const rawNumber = jid
+          .replace("@s.whatsapp.net", "")
+          .replace("@lid", "");
+        let normalizedJid = jid;
+
+        if (jid.endsWith("@lid")) {
+          // Look for existing contact with same number under @s.whatsapp.net
+          const { data: existing } = await supabase
+            .from("WAContacts")
+            .select("jid")
+            .eq("account_id", sessionId)
+            .eq("phone", rawNumber)
+            .neq("jid", jid)
+            .maybeSingle();
+
+          if (existing?.jid) {
+            normalizedJid = existing.jid;
+            console.log(
+              `[${sessionId}] LID normalized: ${jid} → ${normalizedJid}`,
+            );
+          }
+        }
+
         const { error: msgError } = await supabase.from("WAMessages").upsert(
           {
             message_id: msg.key.id,
             account_id: sessionId,
-            jid: jid,
+            jid: normalizedJid,
             from_me: fromMe,
             text: text,
             status: "received",
@@ -138,8 +165,8 @@ async function startSession(sessionId) {
           .upsert(
             {
               account_id: sessionId,
-              jid: jid,
-              phone: jid.replace("@s.whatsapp.net", ""),
+              jid: normalizedJid,
+              phone: rawNumber,
               last_message: text,
               last_message_at: new Date().toISOString(),
             },
