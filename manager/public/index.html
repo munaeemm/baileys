@@ -510,6 +510,7 @@
         BAILEY MANAGER
       </div>
       <div class="header-actions">
+        <button class="btn" onclick="gitPull()">⬇ Git Pull</button>
         <button class="btn btn-update" onclick="updateAll()">
           ↑ Update All Instances
         </button>
@@ -585,7 +586,17 @@
             placeholder="3001"
             min="1024"
             max="65535"
+            oninput="checkPort(this.value)"
           />
+          <div
+            id="port-status"
+            style="
+              font-family: var(--mono);
+              font-size: 10px;
+              margin-top: 4px;
+              min-height: 14px;
+            "
+          ></div>
         </div>
         <div class="form-group">
           <label class="checkbox-row">
@@ -875,6 +886,22 @@
         await loadAccounts();
       }
 
+      // ── Git Pull ──────────────────────────────────────────────────────────────────
+      async function gitPull() {
+        toast("Pulling from GitHub...", "ok");
+        const r = await api("/api/git-pull", "POST");
+        const el = document.getElementById("update-results");
+        const body = document.getElementById("update-results-body");
+        el.style.display = "block";
+        if (r.ok) {
+          body.innerHTML = `<div class="update-results"><div class="update-row-ok">✓ Git Pull Complete</div><pre style="font-size:11px;color:var(--text2);margin-top:8px;white-space:pre-wrap">${r.output}</pre></div>`;
+          toast("Pulled! Now click Update All.", "ok");
+        } else {
+          body.innerHTML = `<div class="update-results"><div class="update-row-err">✗ Git Pull Failed: ${r.error}</div></div>`;
+          toast("Git pull failed", "err");
+        }
+      }
+
       // ── Update all ────────────────────────────────────────────────────────────────
       async function updateAll() {
         toast("Updating all instances...", "ok");
@@ -895,6 +922,35 @@
             .join("") +
           `</div>`;
         toast("Update complete", "ok");
+      }
+
+      // ── Port availability check ───────────────────────────────────────────────────
+      async function checkPort(val) {
+        const el = document.getElementById("port-status");
+        if (!val || val < 1024) {
+          el.innerHTML = "";
+          return;
+        }
+        const port = parseInt(val);
+        // Check against already used ports in existing accounts
+        const used = Object.values(accounts)
+          .filter((a) => (editingId ? a.id !== editingId : true))
+          .map((a) => a.port);
+        if (used.includes(port)) {
+          el.innerHTML = `<span class="number-bad">✗ Port ${port} already in use by another account</span>`;
+          return;
+        }
+        // Check against server
+        try {
+          const r = await api(`/api/check-port?port=${port}`);
+          if (r.available) {
+            el.innerHTML = `<span class="number-ok">✓ Port ${port} is available</span>`;
+          } else {
+            el.innerHTML = `<span class="number-bad">✗ Port ${port} is already in use</span>`;
+          }
+        } catch {
+          el.innerHTML = `<span style="color:var(--text3)">Could not check port</span>`;
+        }
       }
 
       // ── Modal ─────────────────────────────────────────────────────────────────────
