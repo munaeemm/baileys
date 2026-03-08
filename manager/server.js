@@ -1,5 +1,4 @@
 require("dotenv").config({ path: __dirname + "/.env" });
-
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
@@ -7,6 +6,25 @@ const { execSync, exec } = require("child_process");
 
 const app = express();
 app.use(express.json());
+
+const AUTH_USER = process.env.MANAGER_USER || "admin";
+const AUTH_PASS = process.env.MANAGER_PASS || "changeme";
+
+app.use((req, res, next) => {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Basic ")) {
+    res.set("WWW-Authenticate", 'Basic realm="Bailey Manager"');
+    return res.status(401).send("Unauthorised");
+  }
+  const [user, pass] = Buffer.from(auth.slice(6), "base64")
+    .toString()
+    .split(":");
+  if (user !== AUTH_USER || pass !== AUTH_PASS) {
+    return res.status(403).send("Forbidden");
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, "public")));
 
 const ROOT = path.join(__dirname, "..");
