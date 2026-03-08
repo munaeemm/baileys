@@ -1,3 +1,4 @@
+//template\index.js
 const {
   default: makeWASocket,
   DisconnectReason,
@@ -133,6 +134,30 @@ async function connectToWhatsApp() {
       await saveMessage(msg, jid, fromMe);
     }
   });
+
+  sock.ev.on("messages.update", async (updates) => {
+    if (!supabase) return;
+    for (const update of updates) {
+      if (!update.update?.status) continue;
+      await supabase
+        .from("WAMessages")
+        .update({ status: String(update.update.status) })
+        .eq("message_id", update.key.id)
+        .eq("account_id", ACCOUNT_ID);
+    }
+  });
+
+  sock.ev.on("message-receipt.update", async (updates) => {
+    if (!supabase) return;
+    for (const update of updates) {
+      const status = update.receipt.readTimestamp ? "4" : "3";
+      await supabase
+        .from("WAMessages")
+        .update({ status })
+        .eq("message_id", update.key.id)
+        .eq("account_id", ACCOUNT_ID);
+    }
+  });
 }
 
 app.get("/", async (req, res) => {
@@ -166,6 +191,21 @@ app.post("/send", async (req, res) => {
       return res.status(400).json({ error: "jid and text required" });
     if (!isConnected) return res.status(503).json({ error: "Not connected" });
     const sent = await sock.sendMessage(jid, { text });
+    if (supabase) {
+      await supabase.from("WAMessages").upsert(
+        {
+          message_id: sent.key.id,
+          account_id: ACCOUNT_ID,
+          jid,
+          from_me: true,
+          text,
+          status: "2",
+          timestamp: new Date().toISOString(),
+          read: true,
+        },
+        { onConflict: "message_id,account_id" },
+      );
+    }
     res.json({ success: true, messageId: sent.key.id });
   } catch (e) {
     res.status(500).json({ error: e.message });
