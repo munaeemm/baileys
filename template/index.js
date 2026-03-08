@@ -1,14 +1,5 @@
 //template\index.js
-const {
-  default: makeWASocket,
-  DisconnectReason,
-  useMultiFileAuthState,
-  getContentType,
-} = require("@whiskeysockets/baileys");
-const express = require("express");
-const QRCode = require("qrcode");
-const { createClient } = require("@supabase/supabase-js");
-require("dotenv").config();
+
 const {
   default: makeWASocket,
   DisconnectReason,
