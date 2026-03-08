@@ -3,6 +3,7 @@ const {
   DisconnectReason,
   useMultiFileAuthState,
   getContentType,
+  downloadMediaMessage,
 } = require("@whiskeysockets/baileys");
 const express = require("express");
 const QRCode = require("qrcode");
