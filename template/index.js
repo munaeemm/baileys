@@ -105,8 +105,10 @@ async function upsertContact(jid, name, lastMsg, lastMsgAt) {
 async function upsertMessage(msg) {
   if (!supabase) return;
   const key = msg.key;
-  const jid = key.remoteJid;
+  let jid = key.remoteJid;
   if (!jid || jid === "status@broadcast") return;
+  // Normalise @lid to @s.whatsapp.net
+  if (jid.includes("@lid")) return; // skip lid JIDs, can't resolve
 
   const msgId = key.id;
   const fromMe = key.fromMe || false;
