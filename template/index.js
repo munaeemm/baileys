@@ -81,8 +81,9 @@ async function saveMessage(msg, jid, fromMe) {
       text,
       timestamp,
       read: fromMe,
+      status: fromMe ? "2" : null,
     },
-    { onConflict: "message_id,account_id" },
+    { onConflict: "message_id,account_id", ignoreDuplicates: true },
   );
   await supabase
     .from("WAContacts")
@@ -132,6 +133,31 @@ async function connectToWhatsApp() {
       const name = msg.pushName || phone;
       await upsertContact(jid, name, phone);
       await saveMessage(msg, jid, fromMe);
+    }
+  });
+
+  sock.ev.on("messages.update", async (updates) => {
+    if (!supabase) return;
+    for (const update of updates) {
+      if (!update.update?.status) continue;
+      await supabase
+        .from("WAMessages")
+        .update({ status: String(update.update.status) })
+        .eq("message_id", update.key.id)
+        .eq("account_id", ACCOUNT_ID);
+      console.log(`[STATUS] ${update.key.id} → ${update.update.status}`);
+    }
+  });
+
+  sock.ev.on("message-receipt.update", async (updates) => {
+    if (!supabase) return;
+    for (const update of updates) {
+      const status = update.receipt.readTimestamp ? "4" : "3";
+      await supabase
+        .from("WAMessages")
+        .update({ status })
+        .eq("message_id", update.key.id)
+        .eq("account_id", ACCOUNT_ID);
     }
   });
 
