@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Bailey Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0b0d;
+  --surface:#111318;
+  --surface2:#181b22;
+  --border:#232732;
+  --border2:#2e3444;
+  --accent:#25d366;
+  --accent2:#128c7e;
+  --danger:#ff4444;
+  --warn:#f0a500;
+  --text:#e8eaf0;
+  --text2:#8b92a8;
+  --text3:#555e72;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'IBM Plex Sans',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh}
+
+/* ── Top bar ── */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;height:56px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;
+}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:14px;font-weight:600;letter-spacing:.05em}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.header-actions{display:flex;gap:10px}
+
+/* ── Layout ── */
+.container{max-width:1280px;margin:0 auto;padding:32px}
+.section{margin-bottom:40px}
+.section-title{
+  font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--text3);margin-bottom:16px;
+  display:flex;align-items:center;gap:8px;
+}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── Cards ── */
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:20px;
+}
+
+/* ── Supabase config ── */
+.config-row{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end}
+
+/* ── Accounts grid ── */
+.accounts-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(360px,1fr))}
+
+.account-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;overflow:hidden;transition:border-color .2s;
+  position:relative;
+}
+.account-card:hover{border-color:var(--border2)}
+.account-card.connected{border-color:rgba(37,211,102,.25)}
+
+.account-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;border-bottom:1px solid var(--border);
+  background:var(--surface2);
+}
+.account-name{font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px}
+.account-id{font-family:var(--mono);font-size:11px;color:var(--text3)}
+.account-body{padding:16px}
+
+/* ── Status pill ── */
+.pill{
+  display:inline-flex;align-items:center;gap:5px;
+  font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.06em;
+  padding:3px 9px;border-radius:100px;text-transform:uppercase;
+}
+.pill-online{background:rgba(37,211,102,.12);color:var(--accent);border:1px solid rgba(37,211,102,.3)}
+.pill-offline{background:rgba(255,68,68,.1);color:var(--danger);border:1px solid rgba(255,68,68,.25)}
+.pill-starting{background:rgba(240,165,0,.1);color:var(--warn);border:1px solid rgba(240,165,0,.25)}
+
+/* ── Sync badge ── */
+.sync-badge{
+  display:inline-flex;align-items:center;gap:4px;font-size:10px;font-family:var(--mono);
+  color:var(--text3);
+}
+.sync-badge.active{color:var(--accent)}
+.sync-badge svg{width:10px;height:10px}
+
+/* ── Info rows ── */
+.info-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px}
+.info-label{color:var(--text2)}
+.info-val{font-family:var(--mono);font-size:12px;color:var(--text)}
+
+/* ── QR ── */
+.qr-wrap{
+  display:flex;flex-direction:column;align-items:center;gap:12px;
+  padding:20px;background:var(--surface2);border-radius:8px;margin-top:12px;
+}
+.qr-wrap img{width:160px;height:160px;border-radius:6px;border:3px solid var(--accent)}
+.qr-label{font-family:var(--mono);font-size:11px;color:var(--text2);text-align:center}
+
+/* ── Account actions ── */
+.account-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+
+/* ── Test panel ── */
+.test-panel{margin-top:14px;padding:14px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)}
+.test-panel-title{font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
+.test-row{display:flex;gap:8px}
+.number-status{font-family:var(--mono);font-size:10px;margin-top:4px;min-height:14px}
+.number-ok{color:var(--accent)}
+.number-bad{color:var(--danger)}
+
+/* ── Buttons ── */
+btn,button,.btn{
+  font-family:var(--sans);font-size:13px;font-weight:500;
+  border:none;border-radius:6px;padding:8px 14px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;transition:all .15s;white-space:nowrap;
+}
+.btn{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+.btn:hover{background:var(--border);color:var(--text)}
+.btn-primary{background:var(--accent);color:#000;font-weight:600}
+.btn-primary:hover{background:#20c05a}
+.btn-danger{background:rgba(255,68,68,.12);color:var(--danger);border:1px solid rgba(255,68,68,.25)}
+.btn-danger:hover{background:rgba(255,68,68,.22)}
+.btn-warn{background:rgba(240,165,0,.1);color:var(--warn);border:1px solid rgba(240,165,0,.25)}
+.btn-warn:hover{background:rgba(240,165,0,.2)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-update{background:rgba(37,211,102,.1);color:var(--accent);border:1px solid rgba(37,211,102,.3)}
+.btn-update:hover{background:rgba(37,211,102,.2)}
+
+/* ── Forms ── */
+.form-group{margin-bottom:14px}
+label{display:block;font-size:12px;color:var(--text2);margin-bottom:5px;font-family:var(--mono)}
+input[type=text],input[type=number],input[type=password]{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);border-radius:6px;padding:9px 12px;font-family:var(--mono);font-size:13px;
+  outline:none;transition:border-color .15s;
+}
+input:focus{border-color:var(--accent)}
+input::placeholder{color:var(--text3)}
+.checkbox-row{display:flex;align-items:center;gap:10px;cursor:pointer}
+.checkbox-row input{width:auto}
+
+/* ── Modal ── */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.modal-backdrop.open{opacity:1;pointer-events:all}
+.modal{
+  background:var(--surface);border:1px solid var(--border2);border-radius:12px;
+  padding:28px;width:100%;max-width:440px;
+  transform:translateY(12px);transition:transform .2s;
+}
+.modal-backdrop.open .modal{transform:translateY(0)}
+.modal-title{font-family:var(--mono);font-size:14px;font-weight:600;margin-bottom:20px;color:var(--text)}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+
+/* ── Toast ── */
+#toast{
+  position:fixed;bottom:24px;right:24px;z-index:999;
+  display:flex;flex-direction:column;gap:8px;pointer-events:none;
+}
+.toast-msg{
+  background:var(--surface2);border:1px solid var(--border2);border-radius:8px;
+  padding:10px 16px;font-size:13px;font-family:var(--mono);
+  animation:slideIn .2s ease;max-width:320px;
+}
+.toast-ok{border-left:3px solid var(--accent);color:var(--accent)}
+.toast-err{border-left:3px solid var(--danger);color:var(--danger)}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+
+/* ── Misc ── */
+.empty-state{
+  text-align:center;padding:60px 20px;color:var(--text3);
+  font-family:var(--mono);font-size:13px;
+}
+.empty-state .big{font-size:40px;margin-bottom:12px}
+.update-results{margin-top:12px;font-family:var(--mono);font-size:12px;line-height:1.8}
+.update-row-ok{color:var(--accent)}
+.update-row-err{color:var(--danger)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    BAILEY MANAGER
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-update" onclick="updateAll()">↑ Update All Instances</button>
+    <button class="btn btn-primary" onclick="openAddModal()">+ Add Number</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Supabase Config -->
+  <div class="section">
+    <div class="section-title">Supabase Config</div>
+    <div class="card">
+      <div class="config-row">
+        <div class="form-group" style="margin:0">
+          <label>SUPABASE URL</label>
+          <input type="text" id="sb-url" placeholder="https://xxxx.supabase.co"/>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>SERVICE KEY (anon or service_role)</label>
+          <input type="password" id="sb-key" placeholder="eyJ..."/>
+        </div>
+        <button class="btn btn-primary" onclick="saveConfig()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Accounts -->
+  <div class="section">
+    <div class="section-title">WhatsApp Numbers</div>
+    <div id="accounts-grid" class="accounts-grid">
+      <div class="empty-state"><div class="big">📱</div>No numbers added yet.<br/>Click "+ Add Number" to get started.</div>
+    </div>
+  </div>
+
+  <!-- Update results -->
+  <div id="update-results" style="display:none" class="section">
+    <div class="section-title">Last Update Results</div>
+    <div class="card" id="update-results-body"></div>
+  </div>
+
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Add WhatsApp Number</div>
+    <div class="form-group">
+      <label>Account ID <span style="color:var(--text3)">(no spaces, lowercase)</span></label>
+      <input type="text" id="f-id" placeholder="gcprints-main"/>
+    </div>
+    <div class="form-group">
+      <label>Display Name</label>
+      <input type="text" id="f-name" placeholder="GC Prints Main"/>
+    </div>
+    <div class="form-group">
+      <label>Port</label>
+      <input type="number" id="f-port" placeholder="3001" min="1024" max="65535"/>
+    </div>
+    <div class="form-group">
+      <label class="checkbox-row">
+        <input type="checkbox" id="f-sync"/> Sync messages to Supabase
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="modal-submit" onclick="submitModal()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let accounts = {};
+let editingId = null;
+let qrPollers = {};
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  await loadConfig();
+  await loadAccounts();
+  // Poll statuses every 5s
+  setInterval(pollStatuses, 5000);
+}
+
+async function loadConfig() {
+  const r = await api('/api/config');
+  if (r.supabase_url) document.getElementById('sb-url').value = r.supabase_url;
+  if (r.supabase_key) document.getElementById('sb-key').value = r.supabase_key;
+}
+
+async function saveConfig() {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  await api('/api/config', 'POST', { supabase_url: url, supabase_key: key });
+  toast('Supabase config saved', 'ok');
+}
+
+async function loadAccounts() {
+  const list = await api('/api/accounts');
+  accounts = {};
+  list.forEach(a => accounts[a.id] = a);
+  renderAccounts();
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderAccounts() {
+  const grid = document.getElementById('accounts-grid');
+  const list = Object.values(accounts);
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty-state"><div class="big">📱</div>No numbers added yet.<br/>Click "+ Add Number" to get started.</div>`;
+    return;
+  }
+  grid.innerHTML = list.map(a => accountCard(a)).join('');
+}
+
+function accountCard(a) {
+  const st = a.pm2_status || 'stopped';
+  const connected = a.connected;
+  const pillClass = connected ? 'pill-online' : (st === 'online' ? 'pill-starting' : 'pill-offline');
+  const pillLabel = connected ? 'Connected' : (st === 'online' ? 'Starting' : 'Offline');
+
+  return `
+<div class="account-card ${connected ? 'connected' : ''}" id="card-${a.id}">
+  <div class="account-header">
+    <div>
+      <div class="account-name">
+        ${a.name}
+        ${a.sync_supabase ? `<span class="sync-badge active" title="Syncing to Supabase">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          SUPABASE
+        </span>` : ''}
+      </div>
+      <div class="account-id">${a.id} · :${a.port}</div>
+    </div>
+    <span class="pill ${pillClass}">${pillLabel}</span>
+  </div>
+  <div class="account-body">
+    <div class="info-row">
+      <span class="info-label">Phone</span>
+      <span class="info-val">${a.phone || '—'}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Port</span>
+      <span class="info-val">${a.port}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Supabase Sync</span>
+      <span class="info-val">${a.sync_supabase ? '✓ Enabled' : '✗ Disabled'}</span>
+    </div>
+
+    ${!connected && st === 'online' ? `<div id="qr-${a.id}" class="qr-wrap">
+      <div class="qr-label">Waiting for QR code...</div>
+    </div>` : ''}
+
+    <div class="account-actions">
+      ${st !== 'online' ? `<button class="btn btn-primary btn-sm" onclick="startInstance('${a.id}')">▶ Start</button>` : ''}
+      ${st === 'online' ? `<button class="btn btn-sm" onclick="stopInstance('${a.id}')">■ Stop</button>` : ''}
+      ${st === 'online' ? `<button class="btn btn-sm" onclick="restartInstance('${a.id}')">↺ Restart</button>` : ''}
+      <button class="btn btn-warn btn-sm" onclick="logoutInstance('${a.id}')">⟳ Re-scan QR</button>
+      <button class="btn btn-sm" onclick="openEditModal('${a.id}')">✎ Edit</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteInstance('${a.id}')">✕ Delete</button>
+    </div>
+
+    <!-- Test Panel -->
+    <div class="test-panel">
+      <div class="test-panel-title">Test Send</div>
+      <div class="test-row">
+        <div style="flex:1">
+          <input type="text" id="test-num-${a.id}" placeholder="+447849000050"
+            value="+447849000050"
+            oninput="validateNumber('${a.id}')"
+            style="font-size:12px;padding:7px 10px"/>
+          <div class="number-status" id="num-status-${a.id}"></div>
+        </div>
+        <input type="text" id="test-msg-${a.id}" placeholder="Test message..." style="flex:2;font-size:12px;padding:7px 10px"/>
+        <button class="btn btn-primary btn-sm" onclick="sendTest('${a.id}')">Send</button>
+      </div>
+    </div>
+  </div>
+</div>`;
+}
+
+// ── Number normaliser ─────────────────────────────────────────────────────────
+function normalizeNumber(input) {
+  if (!input) return null;
+  let d = input.replace(/\D/g, '');
+  if (d.startsWith('07') && d.length === 11) d = '44' + d.slice(1);
+  else if (d.startsWith('7') && d.length === 10) d = '44' + d;
+  if (d.length < 10) return null;
+  return d;
+}
+
+function validateNumber(id) {
+  const input = document.getElementById(`test-num-${id}`).value;
+  const digits = normalizeNumber(input);
+  const el = document.getElementById(`num-status-${id}`);
+  if (!digits) { el.innerHTML = `<span class="number-bad">✗ Invalid number</span>`; return null; }
+  el.innerHTML = `<span class="number-ok">✓ → +${digits}</span>`;
+  return `${digits}@s.whatsapp.net`;
+}
+
+async function sendTest(id) {
+  const jid = validateNumber(id);
+  if (!jid) { toast('Invalid phone number', 'err'); return; }
+  const text = document.getElementById(`test-msg-${id}`).value.trim();
+  if (!text) { toast('Enter a message', 'err'); return; }
+  const r = await api(`/api/accounts/${id}/send`, 'POST', { number: jid.replace('@s.whatsapp.net',''), text });
+  if (r.success) toast('Message sent!', 'ok');
+  else toast(r.error || 'Send failed', 'err');
+}
+
+// ── Poll statuses ─────────────────────────────────────────────────────────────
+async function pollStatuses() {
+  const ids = Object.keys(accounts);
+  for (const id of ids) {
+    try {
+      const s = await api(`/api/accounts/${id}/status`);
+      const a = accounts[id];
+      a.pm2_status = s.pm2_status;
+      a.connected  = s.connected;
+      a.phone      = s.phone;
+      // Update card status without full re-render
+      updateCardStatus(a);
+      // Handle QR
+      if (!s.connected && s.qr && s.pm2_status === 'online') {
+        fetchAndShowQR(id);
+      } else if (s.connected) {
+        clearQR(id);
+      }
+    } catch {}
+  }
+}
+
+function updateCardStatus(a) {
+  const card = document.getElementById(`card-${a.id}`);
+  if (!card) return;
+  const pill = card.querySelector('.pill');
+  if (!pill) return;
+  const connected = a.connected;
+  const st = a.pm2_status;
+  pill.className = `pill ${connected ? 'pill-online' : (st === 'online' ? 'pill-starting' : 'pill-offline')}`;
+  pill.textContent = connected ? 'Connected' : (st === 'online' ? 'Starting' : 'Offline');
+  card.className = `account-card ${connected ? 'connected' : ''}`;
+  // Update phone
+  const rows = card.querySelectorAll('.info-val');
+  if (rows[0]) rows[0].textContent = a.phone || '—';
+}
+
+async function fetchAndShowQR(id) {
+  const qrDiv = document.getElementById(`qr-${id}`);
+  if (!qrDiv) return;
+  const r = await api(`/api/accounts/${id}/qr`);
+  if (r.qr) {
+    qrDiv.innerHTML = `
+      <img src="${r.qr}" alt="QR Code"/>
+      <div class="qr-label">Scan with WhatsApp → Linked Devices</div>`;
+  }
+}
+
+function clearQR(id) {
+  const qrDiv = document.getElementById(`qr-${id}`);
+  if (qrDiv) qrDiv.remove();
+}
+
+// ── Instance controls ─────────────────────────────────────────────────────────
+async function startInstance(id) {
+  await api(`/api/accounts/${id}/start`, 'POST');
+  toast(`Starting ${id}...`, 'ok');
+  setTimeout(loadAccounts, 1500);
+}
+
+async function stopInstance(id) {
+  await api(`/api/accounts/${id}/stop`, 'POST');
+  toast(`Stopped ${id}`, 'ok');
+  setTimeout(loadAccounts, 1000);
+}
+
+async function restartInstance(id) {
+  await api(`/api/accounts/${id}/restart`, 'POST');
+  toast(`Restarting ${id}...`, 'ok');
+}
+
+async function logoutInstance(id) {
+  if (!confirm(`Clear auth for ${id} and re-scan QR?`)) return;
+  await api(`/api/accounts/${id}/logout`, 'POST');
+  toast('Auth cleared — new QR incoming', 'ok');
+  setTimeout(loadAccounts, 3000);
+}
+
+async function deleteInstance(id) {
+  if (!confirm(`Delete ${id}? This stops the instance. Add purge=1 to also delete files.`)) return;
+  const purge = confirm('Also delete the account folder and auth files?');
+  await api(`/api/accounts/${id}?purge=${purge ? 1 : 0}`, 'DELETE');
+  toast(`Deleted ${id}`, 'ok');
+  await loadAccounts();
+}
+
+// ── Update all ────────────────────────────────────────────────────────────────
+async function updateAll() {
+  toast('Updating all instances...', 'ok');
+  const r = await api('/api/update-all', 'POST');
+  const el = document.getElementById('update-results');
+  const body = document.getElementById('update-results-body');
+  el.style.display = 'block';
+  body.innerHTML = `<div class="update-results">` +
+    r.results.map(x => `<div class="${x.status === 'updated' ? 'update-row-ok' : 'update-row-err'}">
+      ${x.status === 'updated' ? '✓' : '✗'} ${x.id} — ${x.status}${x.error ? ': '+x.error : ''}
+    </div>`).join('') + `</div>`;
+  toast('Update complete', 'ok');
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = 'Add WhatsApp Number';
+  document.getElementById('modal-submit').textContent = 'Create';
+  document.getElementById('f-id').value = '';
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-port').value = '';
+  document.getElementById('f-sync').checked = false;
+  document.getElementById('f-id').disabled = false;
+  document.getElementById('modal').classList.add('open');
+}
+
+function openEditModal(id) {
+  const a = accounts[id];
+  editingId = id;
+  document.getElementById('modal-title').textContent = `Edit — ${a.name}`;
+  document.getElementById('modal-submit').textContent = 'Save';
+  document.getElementById('f-id').value = a.id;
+  document.getElementById('f-name').value = a.name;
+  document.getElementById('f-port').value = a.port;
+  document.getElementById('f-sync').checked = !!a.sync_supabase;
+  document.getElementById('f-id').disabled = true;
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+}
+
+async function submitModal() {
+  const id   = document.getElementById('f-id').value.trim().toLowerCase().replace(/\s+/g,'-');
+  const name = document.getElementById('f-name').value.trim();
+  const port = parseInt(document.getElementById('f-port').value);
+  const sync = document.getElementById('f-sync').checked;
+
+  if (!id || !port) { toast('ID and port required', 'err'); return; }
+
+  if (editingId) {
+    await api(`/api/accounts/${editingId}`, 'PUT', { name, port, sync_supabase: sync });
+    toast('Account updated', 'ok');
+  } else {
+    const r = await api('/api/accounts', 'POST', { id, name, port, sync_supabase: sync });
+    if (r.error) { toast(r.error, 'err'); return; }
+    toast(`${id} created — starting...`, 'ok');
+  }
+  closeModal();
+  await loadAccounts();
+}
+
+// ── API helper ────────────────────────────────────────────────────────────────
+async function api(url, method='GET', body=null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function toast(msg, type='ok') {
+  const el = document.createElement('div');
+  el.className = `toast-msg toast-${type}`;
+  el.textContent = msg;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ── Close modal on backdrop click ─────────────────────────────────────────────
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target.id === 'modal') closeModal();
+});
+
+init();
+</script>
+</body>
+</html>

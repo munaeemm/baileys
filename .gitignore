@@ -1,3 +1,6 @@
 node_modules/
-sessions/
+accounts/
+manager/config.json
+*.env
 .env
+sessions/
