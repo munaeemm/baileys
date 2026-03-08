@@ -81,9 +81,9 @@ async function saveMessage(msg, jid, fromMe) {
       text,
       timestamp,
       read: fromMe,
-      status: fromMe ? "2" : null,
+      status: fromMe ? "2" : "1",
     },
-    { onConflict: "message_id,account_id", ignoreDuplicates: true },
+    { onConflict: "message_id,account_id", ignoreDuplicates: false },
   );
   await supabase
     .from("WAContacts")
