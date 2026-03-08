@@ -139,31 +139,9 @@ async function connectToWhatsApp() {
   sock.ev.on("messages.update", async (updates) => {
     if (!supabase) return;
     for (const update of updates) {
-      if (!update.update?.status) continue;
-      await supabase
-        .from("WAMessages")
-        .update({ status: String(update.update.status) })
-        .eq("message_id", update.key.id)
-        .eq("account_id", ACCOUNT_ID);
-      console.log(`[STATUS] ${update.key.id} → ${update.update.status}`);
-    }
-  });
-
-  sock.ev.on("message-receipt.update", async (updates) => {
-    if (!supabase) return;
-    for (const update of updates) {
-      const status = update.receipt.readTimestamp ? "4" : "3";
-      await supabase
-        .from("WAMessages")
-        .update({ status })
-        .eq("message_id", update.key.id)
-        .eq("account_id", ACCOUNT_ID);
-    }
-  });
-
-  sock.ev.on("messages.update", async (updates) => {
-    if (!supabase) return;
-    for (const update of updates) {
+      console.log(
+        `[MSG UPDATE] ${update.key.id} → ${JSON.stringify(update.update)}`,
+      );
       if (!update.update?.status) continue;
       await supabase
         .from("WAMessages")
@@ -176,6 +154,9 @@ async function connectToWhatsApp() {
   sock.ev.on("message-receipt.update", async (updates) => {
     if (!supabase) return;
     for (const update of updates) {
+      console.log(
+        `[RECEIPT] ${update.key.id} → ${JSON.stringify(update.receipt)}`,
+      );
       const status = update.receipt.readTimestamp ? "4" : "3";
       await supabase
         .from("WAMessages")
