@@ -52,18 +52,16 @@ function extractText(msg) {
 
 async function upsertContact(jid, name, phone) {
   if (!supabase) return;
-  await supabase
-    .from("WAContacts")
-    .upsert(
-      {
-        jid,
-        account_id: ACCOUNT_ID,
-        name,
-        phone,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "jid,account_id" },
-    );
+  await supabase.from("WAContacts").upsert(
+    {
+      jid,
+      account_id: ACCOUNT_ID,
+      name,
+      phone,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "jid,account_id" },
+  );
 }
 
 async function saveMessage(msg, jid, fromMe) {
@@ -73,20 +71,18 @@ async function saveMessage(msg, jid, fromMe) {
     ? new Date(Number(msg.messageTimestamp) * 1000).toISOString()
     : new Date().toISOString();
   if (!text) return;
-  await supabase
-    .from("WAMessages")
-    .upsert(
-      {
-        message_id: msg.key.id,
-        account_id: ACCOUNT_ID,
-        jid,
-        from_me: fromMe,
-        text,
-        timestamp,
-        read: fromMe,
-      },
-      { onConflict: "message_id,account_id" },
-    );
+  await supabase.from("WAMessages").upsert(
+    {
+      message_id: msg.key.id,
+      account_id: ACCOUNT_ID,
+      jid,
+      from_me: fromMe,
+      text,
+      timestamp,
+      read: fromMe,
+    },
+    { onConflict: "message_id,account_id" },
+  );
   await supabase
     .from("WAContacts")
     .update({ last_message: text, last_message_at: timestamp })
@@ -123,7 +119,7 @@ async function connectToWhatsApp() {
     }
   });
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
-    if (type !== "notify") return;
+    if (type !== "notify" && type !== "append") return;
     for (const msg of messages) {
       if (!msg.message) continue;
       const jid = msg.key.remoteJidAlt || msg.key.remoteJid;
