@@ -1,3 +1,6 @@
+// template\index.js
+const multer = require("multer");
+const upload = multer({ storage: multer.memoryStorage() });
 const {
   default: makeWASocket,
   DisconnectReason,
@@ -260,6 +263,67 @@ app.post("/send", async (req, res) => {
         { onConflict: "message_id,account_id" },
       );
     }
+    res.json({ success: true, messageId: sent.key.id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/send-media", upload.single("file"), async (req, res) => {
+  try {
+    const { jid } = req.body;
+    const file = req.file;
+    if (!jid || !file)
+      return res.status(400).json({ error: "Missing jid or file" });
+    if (!isConnected) return res.status(503).json({ error: "Not connected" });
+
+    const isImage = file.mimetype.startsWith("image/");
+    const isVideo = file.mimetype.startsWith("video/");
+    const isAudio = file.mimetype.startsWith("audio/");
+
+    let msgContent;
+    if (isImage) msgContent = { image: file.buffer, caption: "" };
+    else if (isVideo) msgContent = { video: file.buffer, caption: "" };
+    else if (isAudio)
+      msgContent = { audio: file.buffer, mimetype: file.mimetype, ptt: false };
+    else
+      msgContent = {
+        document: file.buffer,
+        mimetype: file.mimetype,
+        fileName: file.originalname,
+      };
+
+    const sent = await sock.sendMessage(jid, msgContent);
+
+    if (supabase) {
+      await supabase.from("WAMessages").upsert(
+        {
+          message_id: sent.key.id,
+          account_id: ACCOUNT_ID,
+          jid,
+          from_me: true,
+          text: isImage
+            ? "[Image]"
+            : isVideo
+              ? "[Video]"
+              : isAudio
+                ? "[Audio]"
+                : `[Document: ${file.originalname}]`,
+          status: "2",
+          timestamp: new Date().toISOString(),
+          read: true,
+          media_type: isImage
+            ? "imageMessage"
+            : isVideo
+              ? "videoMessage"
+              : isAudio
+                ? "audioMessage"
+                : "documentMessage",
+        },
+        { onConflict: "message_id,account_id" },
+      );
+    }
+
     res.json({ success: true, messageId: sent.key.id });
   } catch (e) {
     res.status(500).json({ error: e.message });
