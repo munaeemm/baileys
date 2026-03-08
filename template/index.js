@@ -191,6 +191,21 @@ app.get("/qr", async (req, res) => {
   res.json({ qr: await QRCode.toDataURL(currentQR) });
 });
 
+app.post("/read", async (req, res) => {
+  try {
+    const { jid, messageIds } = req.body;
+    if (!jid || !messageIds?.length)
+      return res.status(400).json({ error: "jid and messageIds required" });
+    if (!isConnected) return res.status(503).json({ error: "Not connected" });
+    await sock.readMessages(
+      messageIds.map((id) => ({ remoteJid: jid, id, fromMe: false })),
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post("/send", async (req, res) => {
   try {
     const { jid, text } = req.body;
