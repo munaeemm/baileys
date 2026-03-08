@@ -1,5 +1,3 @@
-require("dotenv").config({ path: __dirname + "/.env" });
-
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
@@ -7,24 +5,6 @@ const { execSync, exec } = require("child_process");
 
 const app = express();
 app.use(express.json());
-// Basic auth
-const AUTH_USER = process.env.MANAGER_USER || "admin";
-const AUTH_PASS = process.env.MANAGER_PASS || "changeme";
-
-app.use((req, res, next) => {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith("Basic ")) {
-    res.set("WWW-Authenticate", 'Basic realm="Bailey Manager"');
-    return res.status(401).send("Unauthorised");
-  }
-  const [user, pass] = Buffer.from(auth.slice(6), "base64")
-    .toString()
-    .split(":");
-  if (user !== AUTH_USER || pass !== AUTH_PASS) {
-    return res.status(403).send("Forbidden");
-  }
-  next();
-});
 app.use(express.static(path.join(__dirname, "public")));
 
 const ROOT = path.join(__dirname, "..");
@@ -413,6 +393,20 @@ function normalizeToJid(input) {
 app.get("/api/normalize", (req, res) => {
   const jid = normalizeToJid(req.query.number);
   res.json({ jid, valid: !!jid });
+});
+
+// GET /api/check-port
+app.get("/api/check-port", (req, res) => {
+  const port = parseInt(req.query.port);
+  if (!port) return res.status(400).json({ error: "port required" });
+  const net = require("net");
+  const server = net.createServer();
+  server.once("error", () => res.json({ available: false }));
+  server.once("listening", () => {
+    server.close();
+    res.json({ available: true });
+  });
+  server.listen(port);
 });
 
 // ── Start manager ─────────────────────────────────────────────────────────────
