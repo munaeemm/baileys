@@ -9,7 +9,13 @@ const express = require("express");
 const QRCode = require("qrcode");
 const { createClient } = require("@supabase/supabase-js");
 require("dotenv").config();
-
+const {
+  default: makeWASocket,
+  DisconnectReason,
+  useMultiFileAuthState,
+  getContentType,
+  Browsers,
+} = require("@whiskeysockets/baileys");
 const app = express();
 app.use(express.json());
 
@@ -97,7 +103,7 @@ async function connectToWhatsApp() {
   sock = makeWASocket({
     auth: state,
     version: [2, 3000, 1033893291],
-    browser: ["Ubuntu", "Chrome", "20.0.04"],
+    browser: Browsers.ubuntu("Chrome"),
     printQRInTerminal: true,
   });
   sock.ev.on("creds.update", saveCreds);
