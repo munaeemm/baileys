@@ -295,6 +295,29 @@ app.post("/send-media", upload.single("file"), async (req, res) => {
 
     const sent = await sock.sendMessage(jid, msgContent);
 
+    // Upload to Supabase storage so media_url works in CRM
+    let mediaUrl = null;
+    if (supabase) {
+      try {
+        const ext = isImage
+          ? "jpg"
+          : isVideo
+            ? "mp4"
+            : isAudio
+              ? "ogg"
+              : file.originalname.split(".").pop();
+        const filename = `${sent.key.id}.${ext}`;
+        await supabase.storage.from("wa-media").upload(filename, file.buffer, {
+          upsert: true,
+          contentType: file.mimetype,
+        });
+        const { data: pub } = supabase.storage
+          .from("wa-media")
+          .getPublicUrl(filename);
+        mediaUrl = pub.publicUrl;
+      } catch {}
+    }
+
     if (supabase) {
       await supabase.from("WAMessages").upsert(
         {
@@ -319,6 +342,7 @@ app.post("/send-media", upload.single("file"), async (req, res) => {
               : isAudio
                 ? "audioMessage"
                 : "documentMessage",
+          media_url: mediaUrl,
         },
         { onConflict: "message_id,account_id" },
       );
