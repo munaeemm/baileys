@@ -52,18 +52,16 @@ function extractText(msg) {
 
 async function upsertContact(jid, name, phone) {
   if (!supabase) return;
-  await supabase
-    .from("WAContacts")
-    .upsert(
-      {
-        jid,
-        account_id: ACCOUNT_ID,
-        name,
-        phone,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "jid,account_id" },
-    );
+  await supabase.from("WAContacts").upsert(
+    {
+      jid,
+      account_id: ACCOUNT_ID,
+      name,
+      phone,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "jid,account_id" },
+  );
 }
 
 async function saveMessage(msg, jid, fromMe) {
@@ -74,33 +72,61 @@ async function saveMessage(msg, jid, fromMe) {
     : new Date().toISOString();
   if (!text) return;
   const mediaType = msg.message ? getContentType(msg.message) : null;
-  const mediaUrl =
-    msg.message?.imageMessage?.url ||
-    msg.message?.videoMessage?.url ||
-    msg.message?.documentMessage?.url ||
-    null;
-  await supabase
-    .from("WAMessages")
-    .upsert(
-      {
-        message_id: msg.key.id,
-        account_id: ACCOUNT_ID,
-        jid,
-        from_me: fromMe,
-        text,
-        timestamp,
-        read: fromMe,
-        status: fromMe ? "2" : "1",
-        media_type: mediaType,
-        media_url: mediaUrl,
-      },
-      { onConflict: "message_id,account_id", ignoreDuplicates: false },
-    );
+  const isMedia = [
+    "imageMessage",
+    "videoMessage",
+    "documentMessage",
+    "audioMessage",
+  ].includes(mediaType);
+  const mediaUrl = isMedia ? await uploadMedia(msg, mediaType) : null;
+  await supabase.from("WAMessages").upsert(
+    {
+      message_id: msg.key.id,
+      account_id: ACCOUNT_ID,
+      jid,
+      from_me: fromMe,
+      text,
+      timestamp,
+      read: fromMe,
+      status: fromMe ? "2" : "1",
+      media_type: mediaType,
+      media_url: mediaUrl,
+    },
+    { onConflict: "message_id,account_id", ignoreDuplicates: false },
+  );
   await supabase
     .from("WAContacts")
     .update({ last_message: text, last_message_at: timestamp })
     .eq("jid", jid)
     .eq("account_id", ACCOUNT_ID);
+}
+
+async function uploadMedia(msg, mediaType) {
+  if (!supabase) return null;
+  try {
+    const buffer = await downloadMediaMessage(msg, "buffer", {});
+    const ext =
+      mediaType === "imageMessage"
+        ? "jpg"
+        : mediaType === "videoMessage"
+          ? "mp4"
+          : "bin";
+    const filename = `${msg.key.id}.${ext}`;
+    const { data, error } = await supabase.storage
+      .from("wa-media")
+      .upload(filename, buffer, {
+        upsert: true,
+        contentType: mediaType === "imageMessage" ? "image/jpeg" : "video/mp4",
+      });
+    if (error) return null;
+    const { data: pub } = supabase.storage
+      .from("wa-media")
+      .getPublicUrl(filename);
+    return pub.publicUrl;
+  } catch (e) {
+    console.error("[MEDIA]", e.message);
+    return null;
+  }
 }
 
 async function connectToWhatsApp() {
@@ -219,21 +245,19 @@ app.post("/send", async (req, res) => {
     if (!isConnected) return res.status(503).json({ error: "Not connected" });
     const sent = await sock.sendMessage(jid, { text });
     if (supabase) {
-      await supabase
-        .from("WAMessages")
-        .upsert(
-          {
-            message_id: sent.key.id,
-            account_id: ACCOUNT_ID,
-            jid,
-            from_me: true,
-            text,
-            status: "2",
-            timestamp: new Date().toISOString(),
-            read: true,
-          },
-          { onConflict: "message_id,account_id" },
-        );
+      await supabase.from("WAMessages").upsert(
+        {
+          message_id: sent.key.id,
+          account_id: ACCOUNT_ID,
+          jid,
+          from_me: true,
+          text,
+          status: "2",
+          timestamp: new Date().toISOString(),
+          read: true,
+        },
+        { onConflict: "message_id,account_id" },
+      );
     }
     res.json({ success: true, messageId: sent.key.id });
   } catch (e) {
