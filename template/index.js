@@ -126,7 +126,7 @@ async function connectToWhatsApp() {
     if (type !== "notify") return;
     for (const msg of messages) {
       if (!msg.message) continue;
-      const jid = msg.key.remoteJid;
+      const jid = msg.key.remoteJidAlt || msg.key.remoteJid;
       if (!jid || jid === "status@broadcast" || jid.endsWith("@g.us")) continue;
       if (jid.includes("@lid")) continue;
       if (!jid.includes("@s.whatsapp.net")) continue;
