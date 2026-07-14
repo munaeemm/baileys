@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(\\(Get-Content \"e:\\\\New folder\\\\baileys\\\\node_modules\\\\@whiskeysockets\\\\baileys\\\\package.json\" | ConvertFrom-Json\\).version; if \\(Test-Path \"e:\\\\New folder\\\\baileys\\\\manager\\\\node_modules\\\\@whiskeysockets\\\\baileys\\\\package.json\"\\) { \\(Get-Content \"e:\\\\New folder\\\\baileys\\\\manager\\\\node_modules\\\\@whiskeysockets\\\\baileys\\\\package.json\" | ConvertFrom-Json\\).version })",
+      "WebFetch(domain:github.com)",
+      "PowerShell(npm view @whiskeysockets/baileys version)",
+      "PowerShell(npm view @whiskeysockets/baileys dist-tags --json)",
+      "PowerShell(\\(Get-Content \"e:\\\\New folder\\\\baileys\\\\node_modules\\\\@whiskeysockets\\\\baileys\\\\package.json\" | ConvertFrom-Json\\).version)",
+      "PowerShell(Get-ChildItem \"e:\\\\New folder\\\\baileys\\\\accounts\" -Directory | ForEach-Object { $p = Join-Path $_.FullName \"node_modules\\\\@whiskeysockets\\\\baileys\\\\package.json\"; if \\(Test-Path $p\\) { \"$\\($_.Name\\): $\\(\\(Get-Content $p | ConvertFrom-Json\\).version\\)\" } else { \"$\\($_.Name\\): no baileys installed\" } })"
+    ]
+  }
+}
